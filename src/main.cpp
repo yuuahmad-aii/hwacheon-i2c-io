@@ -14,8 +14,7 @@
 #define verbose_perintah_pc 1
 
 unsigned char gerak_motor = 'C'; // A=CW, B=CCW, C=STOP
-byte value_i2c_atc_encoder = 0b00000000;
-byte value_i2c_io = 0b00000000;
+int value_i2c_atc_encoder = 0;
 
 // // variabel untuk parsing perintah serial
 const byte num_chars = 32;      // Panjang maksimal pesan yang diterima
@@ -54,6 +53,12 @@ void setup()
   pinMode(input_tail_depan, INPUT_PULLUP);
   pinMode(input_tail_belakang, INPUT_PULLUP);
   pinMode(input_pedal, INPUT_PULLUP);
+
+  // buat semua menjadi low
+  digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
+  digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+  digitalWriteFast(digitalPinToPinName(output_cw_atc), LOW);
+  digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
 
   Serial.println("Connect: ");
   delay(3000);
@@ -106,7 +111,7 @@ void verbose_output()
   // untuk proxy dan lainnya
   Serial.print("T:");
 
-  Serial.print(digitalReadFast(digitalPinToPinName(input_lock_atc)) ? "L" : "U");
+  Serial.print(digitalReadFast(digitalPinToPinName(input_lock_atc)) ? "U" : "L");
   Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_depan)) ? "D" : "");
   Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_belakang)) ? "B" : "");
   Serial.print(!digitalReadFast(digitalPinToPinName(input_pedal)) ? "P" : "");
@@ -136,7 +141,7 @@ void verbose_output()
 // untuk tools
 #ifdef verbose_tools
   Serial.print("|P:");
-  Serial.print(value_i2c_atc_encoder, BIN);
+  Serial.print((std::bitset<8>(value_i2c_atc_encoder)).to_string().c_str());
 #endif
 
 // untuk eroor
@@ -211,14 +216,20 @@ void parsing_perintah_pc()
     digitalWriteFast(digitalPinToPinName(output_tail_tinggal), HIGH);
     perintah_pc = 'T';
     break;
+    // stop tail stock
+  case 'S':
+    digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
+    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+    perintah_pc = 'S';
+    break;
     // perintah lock atc
   case 'L':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), HIGH);
+    digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
     perintah_pc = 'L';
     break;
     // perintah unlock atc
   case 'U':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
+    digitalWriteFast(digitalPinToPinName(output_lock_atc), HIGH);
     perintah_pc = 'U';
     break;
     // atc bergerak cw
