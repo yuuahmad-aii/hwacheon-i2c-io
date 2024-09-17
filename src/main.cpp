@@ -5,7 +5,7 @@
 #define i2c_add 0x27 // ini khusus untuk absolute encoder
 // #define i2c_add_2 0x20 // ini untuk io lainnya
 
-// #define SCANNING_I2C 1
+#define SCANNING_I2C 1
 #define VERBOSE_TOOLS 1
 #define VERBOSE_TAIL 1
 // #define VERBOSE_MOTOR 1
@@ -99,10 +99,10 @@ void setup()
   else
     Serial.println("done\n");
 
-  digitalWrite(PC13, HIGH); // turn the LED on (HIGH is the voltage level)
-  delay(1000);              // wait for a second
-  digitalWrite(PC13, LOW);  // turn the LED off by making the voltage LOW
-  delay(3000);              // wait for a second
+    // digitalWrite(PC13, HIGH); // turn the LED on (HIGH is the voltage level)
+    // delay(1000);              // wait for a second
+    // digitalWrite(PC13, LOW);  // turn the LED off by making the voltage LOW
+    // delay(3000);              // wait for a second
 #endif
 }
 
@@ -313,9 +313,9 @@ void loop()
     parsing_perintah_pc();
     new_data = false;
   }
-  baca_sinyal_i2c();
   if (kirim_verbose)
   {
+    baca_sinyal_i2c();
     verbose_output();
   }
 
