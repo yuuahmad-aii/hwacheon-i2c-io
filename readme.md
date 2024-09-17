@@ -6,3 +6,8 @@ ini adalah dokumentasi firmware untuk mesin bubut cnc hwaceon di nusapersada. do
     - membalik respon lock dan unlock 
     - tambah program tambahan di setup untuk pertama kali dinyalakan (initial value pin output)
     - buat readme
+2. 5 september 2024
+    - balik logika input pedal
+    - disable sementara input pedal
+3. 17 september 2024
+    - tambah program untuk kirim hanya ketika menerima request

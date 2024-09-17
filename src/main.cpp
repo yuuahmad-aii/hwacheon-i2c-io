@@ -2,74 +2,71 @@
 #include <Wire.h>
 #include <bitset>
 
-#define i2c_add 0x27 // ini khusus untuk absolute encoder
+#define i2c_add 0x20 // ini khusus untuk absolute encoder
 // #define i2c_add_2 0x20 // ini untuk io lainnya
 
-#define verbose 1
-#define scanning_i2c 1
-#define verbose_tools 1
-#define verbose_tail 1
-#define verbose_motor 1
-// #define verbose_error 1
-#define verbose_perintah_pc 1
+#define VERBOSE 1
+// #define SCANNING_I2C 1
+#define VERBOSE_TOOLS 1
+#define VERBOSE_TAIL 1
+// #define VERBOSE_MOTOR 1
+// #define VERBOSE_ERROR 1
+#define VERBOSE_PERINTAH_PC 1
+// #define GERAKKAN_MOTOR 1
 
 unsigned char gerak_motor = 'C'; // A=CW, B=CCW, C=STOP
 int value_i2c_atc_encoder = 0;
 
 // // variabel untuk parsing perintah serial
-const byte num_chars = 32;      // Panjang maksimal pesan yang diterima
+const byte num_chars = 16;      // Panjang maksimal pesan yang diterima
 char received_chars[num_chars]; // Buffer untuk menyimpan pesan yang diterima
 bool new_data = false;          // Menunjukkan apakah ada data baru yang diterima
 char karakter_awal;
 char perintah_pc = '0';
+bool request = false;
 
 // pin input
-#define input_lock_atc PB5
-#define input_tail_depan PB9
-#define input_tail_belakang PB8
-#define input_pedal PB3
+#define INPUT_LOCK_ATC PB5
+#define INPUT_TAIL_DEPAN PB9
+#define INPUT_TAIL_BELAKANG PB8
+// #define INPUT_PEDAL PB3
 // pin output
-#define output_lock_atc PB14
-#define output_cw_atc PB15
-#define output_tail_jemput PC15
-#define output_tail_tinggal PA15
+#define OUTPUT_LOCK_ATC PB14
+#define OUTPUT_CW_ATC PB15
+#define OUTPUT_TAIL_JEMPUT PC15
+#define OUTPUT_TAIL_TINGGAL PA15
 
 void setup()
 {
-  Serial.begin(115200);
+  SerialUSB.begin(115200);
 
   Wire.setSDA(PB11);
   Wire.setSCL(PB10);
+  Wire.setClock(50000); // Set kecepatan menjadi 50kHz
   Wire.begin();
 
   // pinmode output
-  pinMode(PC13, OUTPUT); // lampu indikator
-  pinMode(output_lock_atc, OUTPUT);
-  pinMode(output_tail_jemput, OUTPUT);
-  pinMode(output_tail_tinggal, OUTPUT);
-  pinMode(output_cw_atc, OUTPUT);
+  // pinMode(PC13, OUTPUT); // lampu indikator
+  pinMode(OUTPUT_LOCK_ATC, OUTPUT);
+  pinMode(OUTPUT_TAIL_JEMPUT, OUTPUT);
+  pinMode(OUTPUT_TAIL_TINGGAL, OUTPUT);
+  pinMode(OUTPUT_CW_ATC, OUTPUT);
   // pinmode input
-  pinMode(input_lock_atc, INPUT_PULLUP);
-  pinMode(input_tail_depan, INPUT_PULLUP);
-  pinMode(input_tail_belakang, INPUT_PULLUP);
-  pinMode(input_pedal, INPUT_PULLUP);
+  pinMode(INPUT_LOCK_ATC, INPUT_PULLUP);
+  pinMode(INPUT_TAIL_DEPAN, INPUT_PULLUP);
+  pinMode(INPUT_TAIL_BELAKANG, INPUT_PULLUP);
+  // pinMode(INPUT_PEDAL, INPUT_PULLUP);
 
   // buat semua menjadi low
-  digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-  digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
-  digitalWriteFast(digitalPinToPinName(output_cw_atc), LOW);
-  digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), LOW);
 
-  Serial.println("Connect: ");
-  delay(3000);
-
-#ifdef scanning_i2c
+#ifdef SCANNING_I2C
   // scan i2c
   byte error, address;
   int nDevices;
-
-  Serial.println("Scanning...");
-
   nDevices = 0;
   for (address = 1; address < 127; address++)
   {
@@ -78,60 +75,55 @@ void setup()
 
     if (error == 0)
     {
-      Serial.print("I2C device found at address 0x");
+      SerialUSB.print("I2C device found at address 0x");
       if (address < 16)
-        Serial.print("0");
-      Serial.print(address, HEX);
-      Serial.println("  !");
+        SerialUSB.print("0");
+      SerialUSB.print(address, HEX);
+      SerialUSB.println("  !");
 
       nDevices++;
     }
     else if (error == 4)
     {
-      Serial.print("Unknown error at address 0x");
+      SerialUSB.print("Unknown error at address 0x");
       if (address < 16)
-        Serial.print("0");
-      Serial.println(address, HEX);
+        SerialUSB.print("0");
+      SerialUSB.println(address, HEX);
     }
   }
   if (nDevices == 0)
-    Serial.println("No I2C devices found\n");
+    SerialUSB.println("No I2C devices found\n");
   else
-    Serial.println("done\n");
-
-  digitalWrite(PC13, HIGH); // turn the LED on (HIGH is the voltage level)
-  delay(1000);              // wait for a second
-  digitalWrite(PC13, LOW);  // turn the LED off by making the voltage LOW
-  delay(3000);              // wait for a second
+    SerialUSB.println("done\n");
 #endif
 }
 
 void verbose_output()
 {
   // untuk proxy dan lainnya
-  Serial.print("T:");
+  SerialUSB.print(F("T:"));
 
-  Serial.print(digitalReadFast(digitalPinToPinName(input_lock_atc)) ? "U" : "L");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_depan)) ? "D" : "");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_belakang)) ? "B" : "");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_pedal)) ? "P" : "");
+  SerialUSB.print(digitalReadFast(digitalPinToPinName(INPUT_LOCK_ATC)) ? "U" : "L");
+  SerialUSB.print(!digitalReadFast(digitalPinToPinName(INPUT_TAIL_DEPAN)) ? "D" : "");
+  SerialUSB.print(!digitalReadFast(digitalPinToPinName(INPUT_TAIL_BELAKANG)) ? "B" : "");
+  // SerialUSB.print(digitalReadFast(digitalPinToPinName(INPUT_PEDAL)) ? "P" : "");
 
   // if (nilai_input[0])
-  //     Serial.print("F"); // umbrella didepan
+  //     SerialUSB.print("F"); // umbrella didepan
 
 // untuk pergerakan motor
-#ifdef verbose_motor
-  Serial.print("|M:");
+#ifdef VERBOSE_MOTOR
+  SerialUSB.print("|M:");
   switch (gerak_motor)
   {
   case 'A':
-    Serial.print("A");
+    SerialUSB.print("A");
     break;
   case 'B':
-    Serial.print("B");
+    SerialUSB.print("B");
     break;
   case 'C':
-    Serial.print("C");
+    SerialUSB.print("C");
     break;
   default:
     break;
@@ -139,24 +131,24 @@ void verbose_output()
 #endif
 
 // untuk tools
-#ifdef verbose_tools
-  Serial.print("|P:");
-  Serial.print((std::bitset<8>(value_i2c_atc_encoder)).to_string().c_str());
+#ifdef VERBOSE_TOOLS
+  SerialUSB.print(F("|P:"));
+  SerialUSB.print((std::bitset<8>(value_i2c_atc_encoder)).to_string().c_str());
 #endif
 
 // untuk eroor
-#ifdef verbose_error
-  Serial.print("|E:");
-  Serial.print("unknown");
+#ifdef VERBOSE_ERROR
+  SerialUSB.print("|E:");
+  SerialUSB.print("unknown");
 #endif
 
-// verbose tulis kembali perintah pc
-#ifdef verbose_perintah_pc
-  Serial.print("|R:");
-  Serial.print(perintah_pc);
+// VERBOSE tulis kembali perintah pc
+#ifdef VERBOSE_PERINTAH_PC
+  SerialUSB.print(F("|R:"));
+  SerialUSB.print(perintah_pc);
 #endif
 
-  Serial.println(); // enter, baris selanjutnya
+  SerialUSB.println(); // enter, baris selanjutnya
 }
 
 void recvWithEndMarker()
@@ -165,9 +157,9 @@ void recvWithEndMarker()
   char endMarker = '\n';
   char rc;
 
-  while (Serial.available() > 0 && new_data == false)
+  while (SerialUSB.available() > 0 && new_data == false)
   {
-    rc = Serial.read();
+    rc = SerialUSB.read();
     rc = toUpperCase(rc);
 
     if (rc != endMarker)
@@ -204,37 +196,45 @@ void parsing_perintah_pc()
     // Check Tool Position (P:8 digit biner)
     // Tail Stock (T:1/0) (1 (Jemput) ditekan, 0 (Tinggal) dilepas)
 
+    // request data
+  case '?':
+    request = true;
+    break;
+    // unrequest data
+  case '!':
+    request = false;
+    break;
     // jemput tail stock
   case 'J':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), HIGH);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
     perintah_pc = 'J';
     break;
     // tinggal tail stock
   case 'T':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), HIGH);
     perintah_pc = 'T';
     break;
     // stop tail stock
   case 'S':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
     perintah_pc = 'S';
     break;
     // perintah lock atc
   case 'L':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), LOW);
     perintah_pc = 'L';
     break;
     // perintah unlock atc
   case 'U':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), HIGH);
     perintah_pc = 'U';
     break;
     // atc bergerak cw
   case 'A':
-    digitalWriteFast(digitalPinToPinName(output_cw_atc), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), HIGH);
     perintah_pc = 'A';
     gerak_motor = 'A';
     break;
@@ -245,7 +245,7 @@ void parsing_perintah_pc()
     break;
     // matikan pergerakan atc
   case 'C':
-    digitalWriteFast(digitalPinToPinName(output_cw_atc), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), LOW);
     perintah_pc = 'C';
     gerak_motor = 'C';
     break;
@@ -257,15 +257,19 @@ void parsing_perintah_pc()
 void baca_sinyal_i2c()
 {
   Wire.requestFrom(i2c_add, 1); // request 6 bytes from slave device #8
+  // unsigned long startMillis = millis();
+  // while (Wire.available() == 0)
+  //   if (millis() - startMillis > 100)
+  //   { // Timeout setelah 100ms
+  //     SerialUSB.println("I2C Timeout");
+  //     return;
+  //   }
   while (Wire.available())
     value_i2c_atc_encoder = Wire.read(); // receive a byte as character
-
-  // Wire.requestFrom(i2c_add_2, 1); // request 6 bytes from slave device #8
-  // while (Wire.available())
-  //   value_i2c_io = Wire.read(); // receive a byte as character
 }
 
-void gerakkan_motor()
+#ifdef GERAKKAN_MOTOR
+void GERAKKAN_MOTOR()
 {
   switch (gerak_motor)
   {
@@ -298,16 +302,21 @@ void gerakkan_motor()
 #endif
   }
 }
+#endif
 
 void loop()
 {
+  baca_sinyal_i2c();
   recvWithEndMarker();
   if (new_data == true)
   {
     parsing_perintah_pc();
     new_data = false;
   }
-  baca_sinyal_i2c();
-  verbose_output();
-  // gerakkan_motor();
+  if (request)
+  {
+    verbose_output();
+    // request = false;
+  }
+  // GERAKKAN_MOTOR();
 }
