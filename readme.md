@@ -6,3 +6,5 @@ ini adalah dokumentasi firmware untuk mesin bubut cnc hwaceon di nusapersada. do
     - membalik respon lock dan unlock 
     - tambah program tambahan di setup untuk pertama kali dinyalakan (initial value pin output)
     - buat readme
+1. 17 september 2024
+    - entah kenapa usb cdc tidak dapat digunakan atau dipakai, i dont know what i'm doing :(

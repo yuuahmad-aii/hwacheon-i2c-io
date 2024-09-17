@@ -5,13 +5,12 @@
 #define i2c_add 0x27 // ini khusus untuk absolute encoder
 // #define i2c_add_2 0x20 // ini untuk io lainnya
 
-#define verbose 1
-#define scanning_i2c 1
-#define verbose_tools 1
-#define verbose_tail 1
-#define verbose_motor 1
-// #define verbose_error 1
-#define verbose_perintah_pc 1
+// #define SCANNING_I2C 1
+#define VERBOSE_TOOLS 1
+#define VERBOSE_TAIL 1
+// #define VERBOSE_MOTOR 1
+// #define VERBOSE_ERROR 1
+#define VERBOSE_PERINTAH_PC 1
 
 unsigned char gerak_motor = 'C'; // A=CW, B=CCW, C=STOP
 int value_i2c_atc_encoder = 0;
@@ -22,17 +21,18 @@ char received_chars[num_chars]; // Buffer untuk menyimpan pesan yang diterima
 bool new_data = false;          // Menunjukkan apakah ada data baru yang diterima
 char karakter_awal;
 char perintah_pc = '0';
+bool kirim_verbose = false;
 
 // pin input
-#define input_lock_atc PB5
-#define input_tail_depan PB9
-#define input_tail_belakang PB8
-#define input_pedal PB3
+#define INPUT_LOCK_ATC PB5
+#define INPUT_TAIL_DEPAN PB9
+#define INPUT_TAIL_BELAKANG PB8
+#define INPUT_PEDAL PB3
 // pin output
-#define output_lock_atc PB14
-#define output_cw_atc PB15
-#define output_tail_jemput PC15
-#define output_tail_tinggal PA15
+#define OUTPUT_LOCK_ATC PB14
+#define OUTPUT_CW_ATC PB15
+#define OUTPUT_TAIL_JEMPUT PC15
+#define OUTPUT_TAIL_TINGGAL PA15
 
 void setup()
 {
@@ -44,26 +44,26 @@ void setup()
 
   // pinmode output
   pinMode(PC13, OUTPUT); // lampu indikator
-  pinMode(output_lock_atc, OUTPUT);
-  pinMode(output_tail_jemput, OUTPUT);
-  pinMode(output_tail_tinggal, OUTPUT);
-  pinMode(output_cw_atc, OUTPUT);
+  pinMode(OUTPUT_LOCK_ATC, OUTPUT);
+  pinMode(OUTPUT_TAIL_JEMPUT, OUTPUT);
+  pinMode(OUTPUT_TAIL_TINGGAL, OUTPUT);
+  pinMode(OUTPUT_CW_ATC, OUTPUT);
   // pinmode input
-  pinMode(input_lock_atc, INPUT_PULLUP);
-  pinMode(input_tail_depan, INPUT_PULLUP);
-  pinMode(input_tail_belakang, INPUT_PULLUP);
-  pinMode(input_pedal, INPUT_PULLUP);
+  pinMode(INPUT_LOCK_ATC, INPUT_PULLUP);
+  pinMode(INPUT_TAIL_DEPAN, INPUT_PULLUP);
+  pinMode(INPUT_TAIL_BELAKANG, INPUT_PULLUP);
+  pinMode(INPUT_PEDAL, INPUT_PULLUP);
 
   // buat semua menjadi low
-  digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-  digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
-  digitalWriteFast(digitalPinToPinName(output_cw_atc), LOW);
-  digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), LOW);
+  digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), LOW);
 
   Serial.println("Connect: ");
   delay(3000);
 
-#ifdef scanning_i2c
+#ifdef SCANNING_I2C
   // scan i2c
   byte error, address;
   int nDevices;
@@ -111,16 +111,16 @@ void verbose_output()
   // untuk proxy dan lainnya
   Serial.print("T:");
 
-  Serial.print(digitalReadFast(digitalPinToPinName(input_lock_atc)) ? "U" : "L");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_depan)) ? "D" : "");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_tail_belakang)) ? "B" : "");
-  Serial.print(!digitalReadFast(digitalPinToPinName(input_pedal)) ? "P" : "");
+  Serial.print(digitalReadFast(digitalPinToPinName(INPUT_LOCK_ATC)) ? "U" : "L");
+  Serial.print(!digitalReadFast(digitalPinToPinName(INPUT_TAIL_DEPAN)) ? "D" : "");
+  Serial.print(!digitalReadFast(digitalPinToPinName(INPUT_TAIL_BELAKANG)) ? "B" : "");
+  Serial.print(!digitalReadFast(digitalPinToPinName(INPUT_PEDAL)) ? "P" : "");
 
   // if (nilai_input[0])
   //     Serial.print("F"); // umbrella didepan
 
 // untuk pergerakan motor
-#ifdef verbose_motor
+#ifdef VERBOSE_MOTOR
   Serial.print("|M:");
   switch (gerak_motor)
   {
@@ -139,19 +139,19 @@ void verbose_output()
 #endif
 
 // untuk tools
-#ifdef verbose_tools
+#ifdef VERBOSE_TOOLS
   Serial.print("|P:");
   Serial.print((std::bitset<8>(value_i2c_atc_encoder)).to_string().c_str());
 #endif
 
 // untuk eroor
-#ifdef verbose_error
+#ifdef VERBOSE_ERROR
   Serial.print("|E:");
   Serial.print("unknown");
 #endif
 
-// verbose tulis kembali perintah pc
-#ifdef verbose_perintah_pc
+// VERBOSE tulis kembali perintah pc
+#ifdef VERBOSE_PERINTAH_PC
   Serial.print("|R:");
   Serial.print(perintah_pc);
 #endif
@@ -203,38 +203,44 @@ void parsing_perintah_pc()
     // Unlock ATC (U)
     // Check Tool Position (P:8 digit biner)
     // Tail Stock (T:1/0) (1 (Jemput) ditekan, 0 (Tinggal) dilepas)
-
+    // jemput tail stock
+  case '!':
+    kirim_verbose = false;
+    break; // jemput tail stock
+  case '?':
+    kirim_verbose = true;
+    break;
     // jemput tail stock
   case 'J':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), HIGH);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
     perintah_pc = 'J';
     break;
     // tinggal tail stock
   case 'T':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), HIGH);
     perintah_pc = 'T';
     break;
     // stop tail stock
   case 'S':
-    digitalWriteFast(digitalPinToPinName(output_tail_jemput), LOW);
-    digitalWriteFast(digitalPinToPinName(output_tail_tinggal), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_JEMPUT), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_TAIL_TINGGAL), LOW);
     perintah_pc = 'S';
     break;
     // perintah lock atc
   case 'L':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), LOW);
     perintah_pc = 'L';
     break;
     // perintah unlock atc
   case 'U':
-    digitalWriteFast(digitalPinToPinName(output_lock_atc), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_LOCK_ATC), HIGH);
     perintah_pc = 'U';
     break;
     // atc bergerak cw
   case 'A':
-    digitalWriteFast(digitalPinToPinName(output_cw_atc), HIGH);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), HIGH);
     perintah_pc = 'A';
     gerak_motor = 'A';
     break;
@@ -245,7 +251,7 @@ void parsing_perintah_pc()
     break;
     // matikan pergerakan atc
   case 'C':
-    digitalWriteFast(digitalPinToPinName(output_cw_atc), LOW);
+    digitalWriteFast(digitalPinToPinName(OUTPUT_CW_ATC), LOW);
     perintah_pc = 'C';
     gerak_motor = 'C';
     break;
@@ -308,6 +314,10 @@ void loop()
     new_data = false;
   }
   baca_sinyal_i2c();
-  verbose_output();
+  if (kirim_verbose)
+  {
+    verbose_output();
+  }
+
   // gerakkan_motor();
 }
